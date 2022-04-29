@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 # vim: ft=yaml
 ---
+{% from 'servers/init.sls' import location %}
+{%- set zookeeper_cluster_list = location.zookeeper_cluster| map('regex_replace', '^(.*)$', '\\1:2181') | join(',') %}
 nifi:
-
   pkg:
     name: nifi
     downloadurl: >
-      https://archive.apache.org/dist/nifi/1.14.0/nifi-1.14.0-bin.tar.gz
-    version: 1.14.0
+      https://dlcdn.apache.org/nifi/1.16.0/nifi-1.16.0-bin.tar.gz
+    version: 1.16.0
     installdir: /opt
 
     # Override OpenJDK package to be installed, if value in `osfamilymap.yaml`
@@ -15,8 +16,8 @@ nifi:
     # javajdk: 'java-11-openjdk'
 
   systemdconfig:
-    user: root
-    group: root
+    user: nifi
+    group: nifi
     limitnofile: 50000
     limitnproc: 10000
 
@@ -162,9 +163,9 @@ nifi:
     components.status.snapshot.frequency: 1 min
 
     # Site to Site properties
-    remote.input.host: ''
-    remote.input.secure: 'false'
-    remote.input.socket.port: ''
+    remote.input.host: '{{ grains['fqdn'] }}'
+    remote.input.secure: 'true'
+    remote.input.socket.port: '1112'
     remote.input.http.enabled: 'true'
     remote.input.http.transaction.ttl: '30 sec'
     remote.contents.cache.expiration: '30 secs'
@@ -172,10 +173,10 @@ nifi:
     # web properties #
     web.war.directory: ./lib
     web.http.host: ''
-    web.http.port: 8080
+    web.http.port: ''
     web.http.network.interface.default: ''
-    web.https.host: ''
-    web.https.port: ''
+    web.https.host: '{{ grains['fqdn'] }}'
+    web.https.port: '9443'
     web.https.network.interface.default: ''
     web.jetty.working.directory: ./work/jetty
     web.jetty.threads: 200
@@ -184,22 +185,24 @@ nifi:
     web.proxy.host: ''
 
     # security properties #
-    sensitive.props.key: ''
+    sensitive.props.key: 'dgasB7j4Y/XQUyMRYf0RGKeroJPVh79C'
     sensitive.props.key.protected: ''
     sensitive.props.algorithm: 'PBEWITHMD5AND256BITAES-CBC-OPENSSL'
     sensitive.props.provider: BC
     sensitive.props.additional.keys: ''
 
-    security.keystore: ''
-    security.keystoreType: ''
-    security.keystorePasswd: ''
-    security.keyPasswd: ''
-    security.truststore: ''
-    security.truststoreType: ''
-    security.truststorePasswd: ''
-    security.user.authorizer: managed-authorizer
-    security.user.login.identity.provider: ''
+    security.keystore: './conf/keystore.p12'
+    security.keystoreType: 'pkcs12'
+    security.keystorePasswd: 'dimitris12345!'
+    security.keyPasswd: 'dimitris12345!'
+    security.truststore: './conf/truststore.p12'
+    security.truststoreType: 'pkcs12'
+    security.truststorePasswd: 'verlabs01!'
+    security.user.authorizer: single-user-authorizer
+    security.allow.anonymous.authentication: false
+    security.user.login.identity.provider: 'single-user-provider'
     security.ocsp.responder.url: ''
+    security.user.jws.key.rotation.period: PT1H
     security.ocsp.responder.certificate: ''
 
     # OpenId Connect SSO Properties #
@@ -244,12 +247,12 @@ nifi:
 
     # cluster common properties (all nodes must have same values) #
     cluster.protocol.heartbeat.interval: '5 sec'
-    cluster.protocol.is.secure: 'false'
+    cluster.protocol.is.secure: 'true'
 
     # cluster node properties (only configure for cluster nodes) #
-    cluster.is.node: 'false'
-    cluster.node.address: ''
-    cluster.node.protocol.port: ''
+    cluster.is.node: 'true'
+    cluster.node.address: '{{ grains['fqdn'] }}'
+    cluster.node.protocol.port: '1111'
     cluster.node.protocol.threads: 10
     cluster.node.protocol.max.threads: 50
     cluster.node.event.history.size: 25
@@ -257,8 +260,9 @@ nifi:
     cluster.node.read.timeout: '5 sec'
     cluster.node.max.concurrent.requests: 100
     cluster.firewall.file: ''
-    cluster.flow.election.max.wait.time: '5 mins'
+    cluster.flow.election.max.wait.time: '1 mins'
     cluster.flow.election.max.candidates: ''
+
 
     # cluster load balancing properties #
     cluster.load.balance.host: ''
@@ -268,7 +272,7 @@ nifi:
     cluster.load.balance.comms.timeout: '30 sec'
 
     # zookeeper properties, used for cluster management #
-    zookeeper.connect.string: ''
+    zookeeper.connect.string: '{{zookeeper_cluster_list}}'
     zookeeper.connect.timeout: '3 secs'
     zookeeper.session.timeout: '3 secs'
     zookeeper.root.node: '/nifi'
@@ -358,7 +362,7 @@ nifi:
     java: java
 
     # Username to use when running NiFi. This value will be ignored on Windows.
-    run.as: ''
+    run.as: 'nifi'
 
     # Configure where NiFi's lib and conf directories live
     lib.dir: ./lib
@@ -465,13 +469,12 @@ nifi:
         <cluster-provider>
             <id>zk-provider</id>
             <class>org.apache.nifi.controller.state.providers.zookeeper.ZooKeeperStateProvider</class>
-            <property name="Connect String"></property>
-            <property name="Root Node">/nifi</property>
+            <property name="Connect String">{{zookeeper_cluster_list}}</property>
+            <property name="Root Node">/opt/zookeeper-3.8.0/storage/</property>
             <property name="Session Timeout">10 seconds</property>
             <property name="Access Control">Open</property>
         </cluster-provider>
     </stateManagement>
-
   # Nifi Bootstrap Notifications Service Config File Defaults
   # This is an XML code block. Ensure this is properly indented
   bootstrapnotifications: |
@@ -479,41 +482,49 @@ nifi:
     <services>
       <!-- Put your XML settings here. Indented.  -->
     </services>
-
   # Nifi Login Identify Providers Config File Defaults
   # This is an XML code block. Ensure this is properly indented
   loginidentityproviders: |
     <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <loginIdentityProviders>
-      <!-- Put your XML settings here. Indented.  -->
+      <provider>
+          <identifier>single-user-provider</identifier>
+          <class>org.apache.nifi.authentication.single.user.SingleUserLoginIdentityProvider</class>
+          <property name="Username">admin</property>
+          <property name="Password">$2b$12$gMn66SQjPzR9OYqSJpPobumIK2LQMoN2EhVR7QWG2QbiXms6avDFW</property>
+      </provider>
     </loginIdentityProviders>
-
   # Nifi Login Identify Providers Config File Defaults
   # This is an XML code block. Ensure this is properly indented
   authorizers: |
     <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <authorizers>
-      <userGroupProvider>
-        <identifier>file-user-group-provider</identifier>
-        <class>org.apache.nifi.authorization.FileUserGroupProvider</class>
-        <property name="Users File">./conf/users.xml</property>
-        <property name="Legacy Authorized Users File"></property>
+        <userGroupProvider>
+            <identifier>file-user-group-provider</identifier>
+            <class>org.apache.nifi.authorization.FileUserGroupProvider</class>
+            <property name="Users File">./conf/users.xml</property>
+            <property name="Legacy Authorized Users File"></property>
 
-        <property name="Initial User Identity 1"></property>
-      </userGroupProvider>
-      <accessPolicyProvider>
-        <identifier>file-access-policy-provider</identifier>
-        <class>org.apache.nifi.authorization.FileAccessPolicyProvider</class>
-        <property name="User Group Provider">file-user-group-provider</property>
-        <property name="Authorizations File">./conf/authorizations.xml</property>
-        <property name="Initial Admin Identity"></property>
-        <property name="Legacy Authorized Users File"></property>
-        <property name="Node Identity 1"></property>
-        <property name="Node Group"></property>
-      </accessPolicyProvider>
-      <authorizer>
-        <identifier>managed-authorizer</identifier>
-        <class>org.apache.nifi.authorization.StandardManagedAuthorizer</class>
-        <property name="Access Policy Provider">file-access-policy-provider</property>
-      </authorizer>
+            <property name="Initial User Identity 1"></property>
+        </userGroupProvider>
+
+        <accessPolicyProvider>
+            <identifier>file-access-policy-provider</identifier>
+            <class>org.apache.nifi.authorization.FileAccessPolicyProvider</class>
+            <property name="User Group Provider">file-user-group-provider</property>
+            <property name="Authorizations File">./conf/authorizations.xml</property>
+            <property name="Initial Admin Identity"></property>
+            <property name="Legacy Authorized Users File"></property>
+            <property name="Node Identity 1"></property>
+            <property name="Node Group"></property>
+        </accessPolicyProvider>
+        <authorizer>
+            <identifier>managed-authorizer</identifier>
+            <class>org.apache.nifi.authorization.StandardManagedAuthorizer</class>
+            <property name="Access Policy Provider">file-access-policy-provider</property>
+        </authorizer>
+        <authorizer>
+            <identifier>single-user-authorizer</identifier>
+            <class>org.apache.nifi.authorization.single.user.SingleUserAuthorizer</class>
+        </authorizer>
     </authorizers>
