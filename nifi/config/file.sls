@@ -245,3 +245,19 @@ nifi-zookeepermyid-file-file-managed:
     - context:
         nifi: {{ nifi | json }}
 {% endif %}
+
+{% if nifi.nifi.nars is defined %}
+nars_folder:
+  file.directory:
+    - name: {{ nifi.pkg.installdir }}/nifi-{{ nifi.pkg.version }}/{{ nifi.nifi.nars }}
+    - user: {{ nifi.systemdconfig.user }}
+    - group: {{ nifi.systemdconfig.group }}
+{% endif %}
+
+{% if nifi.nifi.storage is defined %}
+data_directory:
+  file.directory:
+    - name: {{ nifi.nifi.storage }}/nifi/
+    - user: {{ nifi.systemdconfig.user }}
+    - group: {{ nifi.systemdconfig.group }}
+{% endif %}

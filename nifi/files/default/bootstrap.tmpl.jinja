@@ -109,6 +109,16 @@ nifi.dead.notification.services={{ nifi.bootstrap['nifi.dead.notification.servic
 #nifi.dead.notification.services=email-notification
 {% endif -%}
 
+nifi.bootstrap.protection.hashicorp.vault.conf={{ nifi.nifi['hashicorp.vault.conf'] }}
+preserve.environment={{ nifi.nifi.preserve }}
+java.arg.curator.supress.excessive.logs=-Dcurator-log-only-first-connection-issue-as-error-level=true
+java.arg.18={{ nifi.bootstrap['java.arg.18'] }}
+java.arg.19={{ nifi.bootstrap['java.arg.19'] }}
+java.arg.20={{ nifi.bootstrap['java.arg.20'] }}
+java.arg.21={{ nifi.bootstrap['java.arg.21'] }}
+java.arg.22={{ nifi.bootstrap['java.arg.22'] }}
+java.arg.23={{ nifi.bootstrap['java.arg.23'] }}
+
 # Additional Options
 {%- if nifi.bootstrap['additionalconfigenabled'] != 'false' %}
 {{ nifi.bootstrap['additionalconfig'] }}
