@@ -249,7 +249,7 @@ nifi-zookeepermyid-file-file-managed:
 {% if nifi.nifi.nars is defined %}
 nars_folder:
   file.directory:
-    - name: {{ nifi.pkg.installdir }}/nifi-{{ nifi.pkg.version }}/{{ nifi.nifi.nars }}
+    - name: {{ nifi.pkg.installdir }}/{{ nifi.nifi.nars }}
     - user: {{ nifi.systemdconfig.user }}
     - group: {{ nifi.systemdconfig.group }}
 {% endif %}
