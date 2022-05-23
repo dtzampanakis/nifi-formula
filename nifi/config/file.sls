@@ -252,6 +252,7 @@ nars_folder:
     - name: {{ nifi.pkg.installdir }}/{{ nifi.nifi.nars }}
     - user: {{ nifi.systemdconfig.user }}
     - group: {{ nifi.systemdconfig.group }}
+    - mode: 755
 {% endif %}
 
 {% if nifi.nifi.storage is defined %}
